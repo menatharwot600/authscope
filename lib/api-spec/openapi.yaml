@@ -1,0 +1,934 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 1.0.0
+  description: AuthScope controlled authorization lab API. All demo API targets are local synthetic resources.
+servers:
+  - url: /api
+    description: Base API path
+security:
+  - clerkSession: []
+tags:
+  - name: health
+    description: Health operations
+  - name: account
+    description: Authenticated account context
+  - name: dashboard
+    description: Persisted lab metrics and activity
+  - name: lab
+    description: Controlled lab policy
+  - name: demo
+    description: Synthetic demo resources only
+  - name: tests
+    description: Safe authorization test runs and reports
+  - name: findings
+    description: BOLA findings
+  - name: audit
+    description: Authenticated actor audit history
+paths:
+  /healthz:
+    get:
+      security: []
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /me:
+    get:
+      operationId: getCurrentAccount
+      tags: [account]
+      summary: Get the authenticated account context
+      responses:
+        "200":
+          description: Account context
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountContext"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /dashboard:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get persisted dashboard totals, trends, and recent runs
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /lab:
+    get:
+      operationId: getLabConfiguration
+      tags: [lab]
+      summary: Read the active lab policy
+      responses:
+        "200":
+          description: Active lab configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LabConfiguration"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    patch:
+      operationId: updateLabMode
+      tags: [lab]
+      summary: Change the isolated demo API authorization policy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LabModeInput"
+      responses:
+        "200":
+          description: Updated configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LabConfiguration"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /demo/resources:
+    get:
+      operationId: listDemoResources
+      tags: [demo]
+      summary: List synthetic resources visible to the selected demo actor
+      parameters:
+        - $ref: "#/components/parameters/DemoActor"
+      responses:
+        "200":
+          description: Synthetic demo resources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DemoResource"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: createDemoResource
+      tags: [demo]
+      summary: Create a synthetic resource owned by the selected demo actor
+      parameters:
+        - $ref: "#/components/parameters/DemoActor"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DemoResourceInput"
+      responses:
+        "201":
+          description: Created synthetic resource
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DemoResource"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /demo/resources/{resourceId}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceId"
+      - $ref: "#/components/parameters/DemoActor"
+    get:
+      operationId: getDemoResource
+      tags: [demo]
+      summary: Read a synthetic resource under the active object-level policy
+      responses:
+        "200":
+          description: Synthetic resource
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DemoResource"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateDemoResource
+      tags: [demo]
+      summary: Update an owned synthetic resource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DemoResourceUpdate"
+      responses:
+        "200":
+          description: Updated synthetic resource
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DemoResource"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteDemoResource
+      tags: [demo]
+      summary: Delete an owned synthetic resource
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /tests/runs:
+    get:
+      operationId: listTestRuns
+      tags: [tests]
+      summary: Search the authenticated user's persisted test runs
+      parameters:
+        - name: mode
+          in: query
+          schema:
+            $ref: "#/components/schemas/RunMode"
+        - name: result
+          in: query
+          schema:
+            type: string
+            enum: [passed, failed]
+        - name: search
+          in: query
+          schema:
+            type: string
+            maxLength: 120
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Paginated test history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestRunPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: runSecurityTests
+      tags: [tests]
+      summary: Run the safe authorization suite against the active local policy
+      responses:
+        "201":
+          description: Persisted test run and actual API outcomes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestRunDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /tests/runs/{runId}:
+    get:
+      operationId: getTestRun
+      tags: [tests]
+      summary: Get a persisted test run owned by the authenticated user
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: Test run with results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestRunDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /tests/runs/{runId}/report:
+    get:
+      operationId: getTestRunReport
+      tags: [tests]
+      summary: Generate a JSON report from persisted test results
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: Persisted test run report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestReport"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /tests/runs/{runId}/report.pdf:
+    get:
+      operationId: downloadTestRunPdf
+      tags: [tests]
+      summary: Download a PDF report generated from persisted test results
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: PDF report
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /comparison/runs:
+    post:
+      operationId: runPolicyComparison
+      tags: [tests]
+      summary: Execute the same controlled cases against both real policy implementations
+      responses:
+        "201":
+          description: Persisted side-by-side policy comparison
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComparisonRun"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+  /findings:
+    get:
+      operationId: listFindings
+      tags: [findings]
+      summary: List the authenticated user's persisted findings
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/FindingStatus"
+        - name: severity
+          in: query
+          schema:
+            $ref: "#/components/schemas/Severity"
+        - name: search
+          in: query
+          schema:
+            type: string
+            maxLength: 120
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Paginated findings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FindingPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /findings/{findingId}:
+    get:
+      operationId: getFinding
+      tags: [findings]
+      summary: Get a finding owned by the authenticated user
+      parameters:
+        - $ref: "#/components/parameters/FindingId"
+      responses:
+        "200":
+          description: Finding detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Finding"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateFindingStatus
+      tags: [findings]
+      summary: Update a finding's status
+      parameters:
+        - $ref: "#/components/parameters/FindingId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FindingStatusInput"
+      responses:
+        "200":
+          description: Updated finding
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Finding"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /audit-log:
+    get:
+      operationId: listAuditEvents
+      tags: [audit]
+      summary: List audit events for the authenticated actor
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Paginated audit events
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditEventPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+components:
+  securitySchemes:
+    clerkSession:
+      type: apiKey
+      in: cookie
+      name: __session
+  parameters:
+    ResourceId:
+      name: resourceId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    RunId:
+      name: runId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    FindingId:
+      name: findingId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    DemoActor:
+      name: X-Demo-User
+      in: header
+      required: false
+      description: Selects one of the two seeded synthetic demo actors. This is not a platform user identity.
+      schema:
+        type: string
+        enum: [alice, bob]
+        default: alice
+  responses:
+    Unauthorized:
+      description: A valid authenticated session is required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: The synthetic demo actor is not authorized for this resource
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: The requested record was not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    BadRequest:
+      description: The request is invalid
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    RateLimited:
+      description: The authenticated actor has exceeded the test execution limit
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+    AccountContext:
+      type: object
+      properties:
+        userId:
+          type: string
+        authProvider:
+          type: string
+          enum: [clerk]
+      required: [userId, authProvider]
+    RunMode:
+      type: string
+      enum: [vulnerable, secure, comparison]
+    LabMode:
+      type: string
+      enum: [vulnerable, secure]
+    LabConfiguration:
+      type: object
+      properties:
+        mode:
+          $ref: "#/components/schemas/LabMode"
+        updatedAt:
+          type: string
+          format: date-time
+      required: [mode, updatedAt]
+    LabModeInput:
+      type: object
+      properties:
+        mode:
+          $ref: "#/components/schemas/LabMode"
+      required: [mode]
+    DemoActor:
+      type: string
+      enum: [alice, bob]
+    DemoResource:
+      type: object
+      properties:
+        id:
+          type: integer
+        ownerId:
+          $ref: "#/components/schemas/DemoActor"
+        ownerName:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, ownerId, ownerName, name, description, createdAt, updatedAt]
+    DemoResourceInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 80
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+      required: [name, description]
+    DemoResourceUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 80
+        description:
+          type: string
+          minLength: 1
+          maxLength: 500
+    Severity:
+      type: string
+      enum: [critical, high, medium, low, informational]
+    TestOutcome:
+      type: string
+      enum: [allowed, denied, blocked, error]
+    TestResult:
+      type: object
+      properties:
+        id:
+          type: integer
+        caseKey:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        variant:
+          type: string
+          enum: [current, vulnerable, secure]
+        expectedOutcome:
+          $ref: "#/components/schemas/TestOutcome"
+        expectedStatus:
+          type: integer
+        actualOutcome:
+          $ref: "#/components/schemas/TestOutcome"
+        actualStatus:
+          type: integer
+        passed:
+          type: boolean
+        severity:
+          anyOf:
+            - $ref: "#/components/schemas/Severity"
+            - type: "null"
+        evidence:
+          type: string
+        remediation:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - caseKey
+        - name
+        - description
+        - variant
+        - expectedOutcome
+        - expectedStatus
+        - actualOutcome
+        - actualStatus
+        - passed
+        - severity
+        - evidence
+        - remediation
+        - createdAt
+    TestRun:
+      type: object
+      properties:
+        id:
+          type: integer
+        mode:
+          $ref: "#/components/schemas/RunMode"
+        total:
+          type: integer
+        passed:
+          type: integer
+        failed:
+          type: integer
+        findings:
+          type: integer
+        durationMs:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, mode, total, passed, failed, findings, durationMs, createdAt]
+    TestRunDetail:
+      allOf:
+        - $ref: "#/components/schemas/TestRun"
+        - type: object
+          properties:
+            results:
+              type: array
+              items:
+                $ref: "#/components/schemas/TestResult"
+          required: [results]
+    TestRunPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TestRun"
+        total:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+      required: [items, total, page, pageSize]
+    TestReport:
+      type: object
+      properties:
+        title:
+          type: string
+        generatedAt:
+          type: string
+          format: date-time
+        summary:
+          type: string
+        run:
+          $ref: "#/components/schemas/TestRunDetail"
+        remediation:
+          type: array
+          items:
+            type: string
+      required: [title, generatedAt, summary, run, remediation]
+    ComparisonSide:
+      type: object
+      properties:
+        outcome:
+          $ref: "#/components/schemas/TestOutcome"
+        status:
+          type: integer
+        passed:
+          type: boolean
+        evidence:
+          type: string
+      required: [outcome, status, passed, evidence]
+    ComparisonCase:
+      type: object
+      properties:
+        caseKey:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        expectedBehavior:
+          type: string
+        vulnerable:
+          $ref: "#/components/schemas/ComparisonSide"
+        secure:
+          $ref: "#/components/schemas/ComparisonSide"
+        improvement:
+          type: string
+      required: [caseKey, name, description, expectedBehavior, vulnerable, secure, improvement]
+    ComparisonRun:
+      type: object
+      properties:
+        id:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        cases:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComparisonCase"
+        summary:
+          type: string
+      required: [id, createdAt, cases, summary]
+    FindingStatus:
+      type: string
+      enum: [open, fixed, accepted]
+    FindingStatusInput:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/FindingStatus"
+      required: [status]
+    Finding:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        category:
+          type: string
+        severity:
+          $ref: "#/components/schemas/Severity"
+        endpoint:
+          type: string
+        resourceId:
+          type: integer
+        evidence:
+          type: string
+        businessImpact:
+          type: string
+        rootCause:
+          type: string
+        remediation:
+          type: string
+        status:
+          $ref: "#/components/schemas/FindingStatus"
+        runId:
+          type: integer
+        discoveredAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - title
+        - category
+        - severity
+        - endpoint
+        - resourceId
+        - evidence
+        - businessImpact
+        - rootCause
+        - remediation
+        - status
+        - runId
+        - discoveredAt
+        - updatedAt
+    FindingPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Finding"
+        total:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+      required: [items, total, page, pageSize]
+    DashboardTrend:
+      type: object
+      properties:
+        date:
+          type: string
+        passed:
+          type: integer
+        failed:
+          type: integer
+      required: [date, passed, failed]
+    SeverityCount:
+      type: object
+      properties:
+        severity:
+          $ref: "#/components/schemas/Severity"
+        count:
+          type: integer
+      required: [severity, count]
+    DashboardSummary:
+      type: object
+      properties:
+        mode:
+          $ref: "#/components/schemas/LabMode"
+        testsExecuted:
+          type: integer
+        testsPassed:
+          type: integer
+        testsFailed:
+          type: integer
+        vulnerabilitiesDetected:
+          type: integer
+        vulnerabilitiesFixed:
+          type: integer
+        trend:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardTrend"
+        findingsBySeverity:
+          type: array
+          items:
+            $ref: "#/components/schemas/SeverityCount"
+        recentRuns:
+          type: array
+          items:
+            $ref: "#/components/schemas/TestRun"
+      required:
+        - mode
+        - testsExecuted
+        - testsPassed
+        - testsFailed
+        - vulnerabilitiesDetected
+        - vulnerabilitiesFixed
+        - trend
+        - findingsBySeverity
+        - recentRuns
+    AuditEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        actorId:
+          type: string
+        action:
+          type: string
+        detail:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, actorId, action, detail, createdAt]
+    AuditEventPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEvent"
+        total:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+      required: [items, total, page, pageSize]
+

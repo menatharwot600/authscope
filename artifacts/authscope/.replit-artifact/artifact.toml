@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "AuthScope"
+description = "An educational API authorization security lab where students safely reproduce BOLA using synthetic demo resources, compare vulnerable and secure policies, run repeatable tests, and review persisted findings."
+version = "1.0.0"
+id = "artifacts/authscope"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23076
+
+[services.development]
+run = "pnpm --filter @workspace/authscope run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/authscope", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/authscope/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23076"
+BASE_PATH = "/"

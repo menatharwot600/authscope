@@ -1,0 +1,25 @@
+# Render Blueprint - free web service, no credit card needed.
+# Database: use a free external Postgres (Neon) -> paste its URL as DATABASE_URL.
+services:
+  - type: web
+    name: authscope
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: bash scripts/render-build.sh
+    startCommand: node --enable-source-maps artifacts/api-server/dist/index.mjs
+    healthCheckPath: /api/healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: VITE_CLERK_PUBLISHABLE_KEY
+        sync: false

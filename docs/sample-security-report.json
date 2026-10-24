@@ -1,0 +1,63 @@
+{
+  "sampleType": "illustrative-example-not-an-executed-run",
+  "scope": "AuthScope's controlled demo API with synthetic Alice and Bob resources only.",
+  "mode": "vulnerable",
+  "summary": {
+    "total": 6,
+    "passed": 5,
+    "failed": 1,
+    "findings": 1
+  },
+  "results": [
+    {
+      "caseKey": "owner-read",
+      "name": "Owner reads their own resource",
+      "expected": "HTTP 200 allowed",
+      "exampleObserved": "HTTP 200 allowed",
+      "pass": true
+    },
+    {
+      "caseKey": "cross-user-read",
+      "name": "Another user attempts to read the resource",
+      "expected": "HTTP 403 denied",
+      "exampleObserved": "HTTP 200 allowed",
+      "pass": false,
+      "severity": "high",
+      "finding": "BOLA: Bob received synthetic resource 101 owned by Alice."
+    },
+    {
+      "caseKey": "unauthenticated-read",
+      "name": "Unauthenticated user attempts protected access",
+      "expected": "HTTP 401 blocked",
+      "exampleObserved": "HTTP 401 blocked",
+      "pass": true
+    },
+    {
+      "caseKey": "cross-user-update",
+      "name": "User attempts to modify another user's resource",
+      "expected": "HTTP 403 denied",
+      "exampleObserved": "HTTP 403 denied",
+      "pass": true
+    },
+    {
+      "caseKey": "cross-user-delete",
+      "name": "User attempts to delete another user's resource",
+      "expected": "HTTP 403 denied",
+      "exampleObserved": "HTTP 403 denied",
+      "pass": true
+    },
+    {
+      "caseKey": "secure-owner-read",
+      "name": "Owner retains access after the secure policy is enabled",
+      "expected": "HTTP 200 allowed",
+      "exampleObserved": "HTTP 200 allowed",
+      "pass": true
+    }
+  ],
+  "remediation": [
+    "Derive the demo actor from the controlled request context.",
+    "Check resource ownership before returning the requested object.",
+    "Retain ownership checks for all update and delete operations in every mode."
+  ],
+  "note": "This fixture illustrates the report format and expected vulnerable-mode behavior. It is not a persisted test run or evidence from a live execution. Use AuthScope's Run Security Tests action to generate an actual report."
+}
